@@ -20,14 +20,22 @@ class Colors:
     CLEAR = "\033c"
 
 USER_NAME='You'
-CHATGPT_NAME='CliGPT'
+CLIGPT_NAME='CliGPT'
 CHAT_HISTORY_PATH=r'/Users/hami/Documents/cligpt-results/'
+"""
+else:
+                if OS == 'windows':
+                        path=r'C:\\Windows\\Temp\\'
+                else:
+                        path=r'/tmp/'
+"""
+
 WELCOME_MSG=f"""Welcome!
 Ask me anything. Special commands:
   - {Colors.BOLD}quit, exit, goodbye,{Colors.END} and {Colors.BOLD}bye;{Colors.END} terminate application
   - {Colors.BOLD}clear{Colors.END}; clears the terminal screen
   - {Colors.BOLD}save{Colors.END}; saves the entire chat history to one file
-  - {Colors.BOLD}save code{Colors.END}; saves all of the code provided by {CHATGPT_NAME}
+  - {Colors.BOLD}save code{Colors.END}; saves all of the code provided by {CLIGPT_NAME}
 """
 
 LANGUAGES = {
@@ -62,3 +70,4 @@ REGEX_PATTERNS={
         'code_language': '|'.join([ language for language in LANGUAGES if not language == 'unidentified'])
 }
 
+END_MSGS = ['quit','exit','bye','goodbye']

@@ -9,74 +9,10 @@ from datetime import datetime
 ### APIs
 import APIs.OpenAI
 import APIs.AwanLLM
+import settings
 
-class Colors:
-    """ ANSI color codes """
-    BLACK = "\033[0;30m"
-    RED = "\033[0;31m"
-    GREEN = "\033[0;32m"
-    BLUE = "\033[0;34m"
-    PURPLE = "\033[0;35m"
-    CYAN = "\033[0;36m"
-    YELLOW = "\033[1;33m"
-    BOLD = "\033[1m"
-    FAINT = "\033[2m"
-    ITALIC = "\033[3m"
-    UNDERLINE = "\033[4m"
-    BLINK = "\033[5m"
-    NEGATIVE = "\033[7m"
-    CROSSED = "\033[9m"
-    END = "\033[0m"
-    CLEAR = "\033c"
-
-USER_NAME='You'
-CHATGPT_NAME='CliGPT'
-CHAT_HISTORY_PATH=r'/Users/hami/Documents/cligpt-results/'
-WELCOME_MSG=f"""Welcome!
-Ask me anything. Special commands:
-  - {Colors.BOLD}quit, exit, goodbye,{Colors.END} and {Colors.BOLD}bye;{Colors.END} terminate application
-  - {Colors.BOLD}clear{Colors.END}; clears the terminal screen
-  - {Colors.BOLD}save{Colors.END}; saves the entire chat history to one file
-  - {Colors.BOLD}save code{Colors.END}; saves all of the code provided by {CHATGPT_NAME}
-"""
-
-LANGUAGES = {
-        'python' : {
-		'suffix': 'py'
-	},
-        'bash' : {
-		'suffix': 'sh'
-	},
-        'powershell' : {
-		'suffix': 'ps'
-	},
-        'javascript' : {
-		'suffix': 'js'
-	},
-        'csharp' : {
-		'suffix': 'cs'
-	},
-        'go' : {
-		'suffix': 'go'
-	},
-        'ruby' : {
-		'suffix': 'rb'
-	},
-        'unidentified': {
-		'suffix': 'txt'
-        }
-}
-
-REGEX_PATTERNS={
-        'codeblock': r'^[\s\t]{0,}```',
-        'code_language': '|'.join([ language for language in LANGUAGES if not language == 'unidentified'])
-}
-
-OS=""
-
+USED_GPT = APIs.AwanLLM.AwanLLM
 CODE_HISTORY = []
-
-END_MSGS = ['quit','exit','bye','goodbye']
 
 def replace_code_tags(match):
     if replace_code_tags.counter % 2 == 0:
@@ -88,17 +24,17 @@ def replace_code_tags(match):
 
 replace_code_tags.counter = 0
 
-def enable_ansi():
-    global OS
+def ensure_ansi_interpretation():
     if os.name == 'nt':
         #To make ansi escape sequences work for windows
         os.system("")
-        OS='windows'
-    else:
-        OS='unix'
+
+def print_welcome_message():
+        print(f'{settings.Colors.RED}{settings.CLIGPT_NAME}:{settings.Colors.END}',settings.WELCOME_MSG)
+
 
 def print_goodbye():
-    print(f'{Colors.BOLD}Goodbye!{Colors.END}')
+    print(f'{settings.Colors.BOLD}Goodbye!{settings.Colors.END}')
 
 def get_input():
     try:
@@ -134,13 +70,9 @@ def get_input():
         print_goodbye()
         exit(1)
 
-def show_output(response, status):
+def show_output(cgpt_msg, status):
 
-    if status == 'success' and response.status_code == 200:
-        response_json = response.json()
-        cgpt_msg = response_json['choices'][0]['message']['content']
-        cgpt_role = response_json['choices'][0]['message']['role']
-        BODY['messages'].append({'role': cgpt_role, 'content': cgpt_msg})
+    if status == 'success':
         codeblock = re.search(REGEX_PATTERNS['codeblock'], cgpt_msg, flags=re.DOTALL|re.M)
 
         code = []
@@ -187,48 +119,44 @@ def show_output(response, status):
 
 
     elif status == 'fail':
-        print(f'{Colors.RED}ERROR: Unable to reach url {URL}. {Colors.END}')
+        print(f'{settings.Colors.RED}ERROR: Unable to reach GPT URL. {settings.Colors.END}')
     else:
-        print(f'{Colors.RED}ERROR: {response.text}{Colors.END}')
+        print(f'{settings.Colors.RED}ERROR: {response.text}{settings.Colors.END}')
 
 def save_codeblock(codeblock, language, increment=1):
-        if CHAT_HISTORY_PATH:
-                path=CHAT_HISTORY_PATH
-        else:
-                if OS == 'windows':
-                        path=r'C:\\Windows\\Temp\\'
-                else:
-                        path=r'/tmp/'
-
         ts = datetime.now().strftime('%Y%m%d-%H-%M-%S')
-
-        file_path=f'{path}cligpt-{ts}-{increment}.{LANGUAGES[language]["suffix"]}'
-
+        file_path=f'{settings.CHAT_HISTORY_PATH}cligpt-{ts}-{increment}.{LANGUAGES[language]["suffix"]}'
         with open(file_path, 'wt') as code_file:
                 code_file.write(codeblock)
                 code_file.close()
         return file_path
 
+def parse_gpt_response(response:str = "", used_gpt:str = ""):
+        cgpt_msg = response_json['choices'][0]['message']['content']
+        cgpt_role = response_json['choices'][0]['message']['role']
 
 
 if __name__ == '__main__':
-    enable_ansi()
-    print(f'{Colors.RED}{CHATGPT_NAME}:{Colors.END}',WELCOME_MSG)
+    ensure_ansi_interpretation()
+    print_welcome_message()
     if len(sys.argv) > 1:
         message = " ".join(sys.argv[1:])
     else:
         message = get_input()
 
-    BODY['messages'].append({'role': 'user', 'content': message})
+    gpt = USED_GPT()
 
     while True:
+        message = get_input()
+        BODY['messages'].append({'role': 'user', 'content': message})
+
         try:
-                resp = requests.post(url=URL, headers=HEADER, json=BODY)
+                resp = requests.post(url=gpt.URL, headers=gpt.HEADERS, json=gpt.BODY)
                 status = 'success'
         except:
                 resp = None
                 status = 'fail'
-        show_output(resp, status)
-        message = get_input()
-
-        BODY['messages'].append({'role': 'user', 'content': message})
+        
+        gpt_role, gpt_msg = parse_gpt_response(response=resp,used_gpt=gpt.NAME)
+        BODY['messages'].append({'role': gpt_role, 'content': gpt_msg})
+        show_output(gpt_msg, status)

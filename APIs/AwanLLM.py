@@ -1,23 +1,26 @@
-url = "https://api.awanllm.com/v1/chat/completions"
-api_key = "9c83ac55-26db-4691-8e9c-0f1964a3dc78"
-model_name = "Meta-Llama-3.1-70B-Instruct"
+import os
 
-payload = {
-  "model": f"{model_name}",
-  "messages": [
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "Hello!"},
-    {"role": "assistant", "content": "Hi!, how can I help you today?"}
-  ],
-  "repetition_penalty": 1.1,
-  "temperature": 0.7,
-  "top_p": 0.9,
-  "top_k": 40,
-  "max_tokens": 1024,
-  "stream": True
-}
+class AwanLLM:
+  GPT_NAME="AwanLLM"
+  API_KEY= os.environ['AWANLLM_API_KEY'] if 'AWANLLM_API_KEY' in os.environ else ""
+  URL="https://api.awanllm.com/v1/chat/completions"
+  MODEL_NAME = "Meta-Llama-3.1-70B-Instruct"
+  INITIAL_LLM_INSTRUCTIONS="You are a helpful assistant."
 
-headers = {
-  'Content-Type': 'application/json',
-  f'Authorization': f"Bearer {api_key}"
-}
+  HEADERS = {
+    'Content-Type': 'application/json',
+    f'Authorization': f"Bearer {API_KEY}"
+  }
+  BODY = {
+    "model": f"{MODEL_NAME}",
+    "messages": [
+      {"role": "system", "content": INITIAL_LLM_INSTRUCTIONS}
+    ],
+    "repetition_penalty": 1.1,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 40,
+    "max_tokens": 1024,
+    "stream": True
+  }
+
