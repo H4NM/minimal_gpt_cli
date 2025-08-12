@@ -7,11 +7,12 @@ import re
 from datetime import datetime
 
 ### APIs
-import APIs.OpenAI
-import APIs.AwanLLM
+from APIs.OpenAI import ChatGPT 
+from APIs.AwanLLM import AwanLLM 
+from APIs.VeniceAI import VeniceAI
 import settings
 
-USED_GPT = APIs.AwanLLM.AwanLLM
+GPT_LIST = [ChatGPT, AwanLLM, VeniceAI]
 CODE_HISTORY = []
 
 def replace_code_tags(match):
@@ -36,13 +37,13 @@ def print_welcome_message():
 def print_goodbye():
     print(f'{settings.Colors.BOLD}Goodbye!{settings.Colors.END}')
 
-def get_input():
-    try:
+def get_input(gpt_name:str):
+    #try:
         while True:
-                msg = input(f'{Colors.GREEN}{USER_NAME}:{Colors.END} ')
+                msg = input(f'{settings.Colors.GREEN}{settings.USER_NAME}:{settings.Colors.END} ')
                 stripped_msg = msg.strip()
-                if stripped_msg in END_MSGS:
-                        raise Exception('Self quit')
+                if stripped_msg in settings.END_MSGS:
+                        return None
                 elif stripped_msg == 'clear':
                         print(Colors.CLEAR, end="")
                 elif stripped_msg == 'save':
@@ -51,9 +52,9 @@ def get_input():
 
                                 for old_message in BODY['messages']:
                                         if old_message['role'] == 'user':
-                                                writer = USER_NAME
+                                                writer = settings.USER_NAME
                                         else:
-                                                writer = CHATGPT_NAME
+                                                writer = f"{settings.CLIGPT_NAME}({settings.CHATGPT_NAME})"
                                         parsed_message_history.append(writer+': '+old_message['content'])
 
                                 file_path = save_codeblock("\n".join(parsed_message_history), 'unidentified')
@@ -66,31 +67,31 @@ def get_input():
                                 print(f'[!] No code history to save')
                 elif len(stripped_msg) > 0:
                         return msg
-    except:
-        print_goodbye()
-        exit(1)
+    #except:
+    #    print_goodbye()
+    #    exit(1)
 
-def show_output(cgpt_msg, status):
+def show_output(gpt_name, gpt_msg, status):
 
     if status == 'success':
-        codeblock = re.search(REGEX_PATTERNS['codeblock'], cgpt_msg, flags=re.DOTALL|re.M)
+        codeblock = re.search(REGEX_PATTERNS['codeblock'], gpt_msg, flags=re.DOTALL|re.M)
 
         code = []
         if codeblock:
                 global CODE_HISTORY
-                codeblock_lang_found = re.search(REGEX_PATTERNS['codeblock']+'('+REGEX_PATTERNS['code_language']+')', cgpt_msg, flags=re.DOTALL|re.M)
+                codeblock_lang_found = re.search(REGEX_PATTERNS['codeblock']+'('+REGEX_PATTERNS['code_language']+')', gpt_msg, flags=re.DOTALL|re.M)
                 if codeblock_lang_found:
                         code_language = codeblock_lang_found.group(1)
                 else:
                         code_language = "unidentified"
                 code = re.findall(REGEX_PATTERNS['codeblock']+'(.*?)'+REGEX_PATTERNS['codeblock']+'$',
-                cgpt_msg,
+                gpt_msg,
                 flags=re.M|re.DOTALL)
                 codeblocks = len(code)
                 CODE_HISTORY += code
-                cgpt_msg = re.sub(r'```', replace_code_tags, cgpt_msg)
+                gpt_msg = re.sub(r'```', replace_code_tags, gpt_msg)
 
-        print(f'{Colors.RED}{CHATGPT_NAME}:{Colors.END}',cgpt_msg)
+        print(f'{Colors.RED}{CLIGPT_NAME}({gpt_name}):{Colors.END}',gpt_msg)
 
         if code:
                 if codeblocks == 1:
@@ -132,23 +133,34 @@ def save_codeblock(codeblock, language, increment=1):
         return file_path
 
 def parse_gpt_response(response:str = "", used_gpt:str = ""):
-        cgpt_msg = response_json['choices'][0]['message']['content']
+        gpt_msg = response_json['choices'][0]['message']['content']
         cgpt_role = response_json['choices'][0]['message']['role']
 
+def get_gpt_model(gpts:list):
+    for pos, gpt in enumerate(gpts):
+        gpt_instance = gpt()
+        if gpt_instance.API_KEY:
+            gpt_removed_list = gpts.pop(pos)
+            return gpt_removed_list, gpt()
+    return [], None
 
 if __name__ == '__main__':
     ensure_ansi_interpretation()
+
+    gpt_list, gpt = get_gpt_model(gpts=GPT_LIST)
+    if gpt_list == None or gpt == None:
+        print('No valid GPTs found. Exiting..')
+        exit(1)
+
     print_welcome_message()
+
     if len(sys.argv) > 1:
         message = " ".join(sys.argv[1:])
     else:
-        message = get_input()
-
-    gpt = USED_GPT()
+        message = get_input(gpt_name=gpt.GPT_NAME)
+        gpt.BODY['messages'].append({'role': 'user', 'content': message})
 
     while True:
-        message = get_input()
-        BODY['messages'].append({'role': 'user', 'content': message})
 
         try:
                 resp = requests.post(url=gpt.URL, headers=gpt.HEADERS, json=gpt.BODY)
@@ -157,6 +169,14 @@ if __name__ == '__main__':
                 resp = None
                 status = 'fail'
         
-        gpt_role, gpt_msg = parse_gpt_response(response=resp,used_gpt=gpt.NAME)
+        gpt_role, gpt_msg = gpt.parse_response(response=resp, used_gpt=gpt.GPT_NAME)
         BODY['messages'].append({'role': gpt_role, 'content': gpt_msg})
         show_output(gpt_msg, status)
+
+
+        #### Lägga till så APIs har en funktion för att lägga till meddelandet i historiken då de för definierat vet vad rollen ska heta.
+        #### Lägga till så APIs har en funktion för att parsa ut meddelandet
+        #### Separat funktion för att parsa ut kodblock? 
+        #### Funktion för att känna igen om tokens/gräns är förbrukad, då den ska byta över till ny konversation med ny bot
+
+
